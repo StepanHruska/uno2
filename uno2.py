@@ -1,4 +1,38 @@
+import pygame 
 import random
+import os
+
+# Inicializace Pygame
+pygame.init()
+
+# Nastavení okna
+SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Uno Game")
+
+# Cesty k souborům
+CARDS_PATH = "/workspaces/UNO2/cards"
+
+# Načítání karet
+def load_card(card_name):
+    card = pygame.image.load(os.path.join(CARDS_PATH, card_name))
+    return pygame.transform.scale(card, (100, 150))  # Přizpůsobíme velikost karet  # Tento adresář by měl obsahovat obrázky karet
+
+# Fonty
+font = pygame.font.Font(None, 36)
+
+# Funkce pro vykreslení textu
+def draw_text(text, x, y, color=(255, 255, 255)):
+    label = font.render(text, True, color)
+    screen.blit(label, (x, y))
+
+# Funkce pro zobrazení tlačítka
+def draw_button(text, x, y, width, height, action=None):
+    # Vykreslení tlačítka
+    pygame.draw.rect(screen, (0, 0, 0), (x, y, width, height))  # Rámování tlačítka
+    pygame.draw.rect(screen, (255, 255, 255), (x + 5, y + 5, width - 10, height - 10))  # Tlačítko se světlým pozadím
+    draw_text(text, x + 10, y + 10)
+    return pygame.Rect(x, y, width, height)
 
 #vygeneruje balicek(list) 180 karet
 def buildDeck():
@@ -107,7 +141,7 @@ while playing:
             if currentColour == "Wild":
                 for x in range(len(colours)):
                     print("{} {}".format(x+1, colours[x]))
-                newColour = int(input("What colour would you like to choose?"))
+                    newColour = int(input("What colour would you like to choose?"))
                 while newColour < 1 or newColour > 4:
                     newColour = int(input("Invalid option. What colour would you like to choose?")) 
                 currentColour = colours[newColour-1]
@@ -147,3 +181,20 @@ while playing:
 
 print("Game over")
 print("{} is the winner".format(winner))
+
+# Hlavní smyčka Pygame
+running = True
+
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:  # Zpracování zavření okna
+            running = False
+
+    # Vyplnění pozadí barvou (volitelné)
+    screen.fill((0, 128, 0))  # Zelené pozadí
+
+    # Aktualizace obsahu okna
+    pygame.display.flip()
+
+# Ukončení Pygame
+pygame.quit()

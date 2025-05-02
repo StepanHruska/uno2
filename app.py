@@ -1,7 +1,11 @@
 from flask import Flask, render_template, request
 from uno2 import buildDeck, shuffleDeck, drawCards, canPlay, showHand
+import os 
 
 app = Flask(__name__)
+
+#cesta k souborum
+CARDS_PATH = os.path.join(os.getcwd(), "cards")
 
 # Initialize game variables
 unoDeck = shuffleDeck(buildDeck())
@@ -13,6 +17,10 @@ playerTurn = 0
 playDirection = 1
 playing = True
 
+# Načítání karty - vrací URL na obrázek karty
+def load_card(card_name):
+    return f"/cards/{card_name}"  # Vrací cestu k obrázku
+
 # Route for the main game page
 @app.route('/')
 def index():
@@ -21,7 +29,7 @@ def index():
         # Initialize players and deal cards
         players = [drawCards(7) for _ in range(numPlayers)]
         discards.append(unoDeck.pop(0))
-    return render_template('index.html', players=players, discards=discards, playerTurn=playerTurn)
+    return render_template('uno.html', players=players, discards=discards, playerTurn=playerTurn)
 
 # Route to handle player actions
 @app.route('/play', methods=['POST'])
