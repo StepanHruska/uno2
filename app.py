@@ -1,47 +1,63 @@
-from flask import Flask, render_template, request
-from uno2 import buildDeck, shuffleDeck, drawCards, canPlay, showHand
-import os 
+from flask import Flask, render_template, request, redirect, url_for
+from game_logic import Game
 
 app = Flask(__name__)
+game = Game()
 
-#cesta k souborum
-CARDS_PATH = os.path.join(os.getcwd(), "cards")
-
-# Initialize game variables
-unoDeck = shuffleDeck(buildDeck())
-players = []
-discards = []
-colours = ["Red", "Green", "Blue", "Yellow"]
-numPlayers = 2
-playerTurn = 0
-playDirection = 1
-playing = True
-
-# Načítání karty - vrací URL na obrázek karty
-def load_card(card_name):
-    return f"/cards/{card_name}"  # Vrací cestu k obrázku
-
-# Route for the main game page
-@app.route('/')
+@app.route("/")
 def index():
-    global players, discards, unoDeck, playerTurn, playing
-    if not players:
-        # Initialize players and deal cards
-        players = [drawCards(7) for _ in range(numPlayers)]
-        discards.append(unoDeck.pop(0))
-    return render_template('uno.html', players=players, discards=discards, playerTurn=playerTurn)
+    if game.is_game_over():
+        winner = game.get_winner()
+        return render_template("game.html", game_over=True, winner=winner)
 
-# Route to handle player actions
-@app.route('/play', methods=['POST'])
-def play():
-    global players, discards, playerTurn, playing
-    card_index = int(request.form['card_index'])
-    if canPlay(discards[-1].split()[0], discards[-1].split()[-1], [players[playerTurn][card_index]]):
-        discards.append(players[playerTurn].pop(card_index))
-        if len(players[playerTurn]) == 0:
-            playing = False
-            return f"Player {playerTurn + 1} wins!"
-    return "Card played!"
+    player = game.players[0]
+    bot = game.players[1]
+    return render_template("game.html",
+                           player_hand=player.hand,
+                           top_card=game.discard_pile[-1],
+                           bot_card_count=len(bot.hand),
+                           message=game.message,
+                           game_over=False)
 
-if __name__ == '__main__':
+@app.route("/play/<int:card_index>", methods=["POST"])
+def play(card_index):
+    # Zabrání hráči hrát mimo svůj tah
+    if game.current_player_idx != 0:
+        game.message = "It's not your turn!"
+        return redirect(url_for("index"))
+
+    color = request.form.get("color")
+    game.play_player_card(card_index, chosen_color=color)
+
+    # Po hráčově tahu přechází hra automaticky na bota (pokud nebyl přeskočen)
+    if game.current_player_idx == 1 and not game.is_game_over():
+        game.play_computer_turn()
+
+    return redirect(url_for("index"))
+
+@app.route("/draw", methods=["POST"])
+def draw():
+    # Zabrání hráči táhnout mimo svůj tah
+    if game.current_player_idx != 0:
+        game.message = "It's not your turn!"
+        return redirect(url_for("index"))
+
+    player = game.players[0]
+    player.draw(game.deck)
+    game.message = "You drew a card."
+    game.next_player()
+
+    # Po tahu hráče (tahání) hraje bot
+    if not game.is_game_over():
+        game.play_computer_turn()
+
+    return redirect(url_for("index"))
+
+@app.route("/reset")
+def reset():
+    global game
+    game = Game()
+    return redirect(url_for("index"))
+
+if __name__ == "__main__":
     app.run(debug=True)
