@@ -23,6 +23,9 @@ class ActionCard(Card):
             game.direction *= -1
         elif self.value == 'Skip':
             game.next_player()
+            game.message += f" {game.players[game.current_player_idx].name} is skipped."
+            game.next_player()
+            return True  # signal to skip turn
         elif self.value == '+2':
             game.next_player()
             game.players[game.current_player_idx].draw(game.deck, 2)
@@ -128,6 +131,10 @@ class Game:
 
     def play_player_card(self, card_index, chosen_color=None):
         player = self.players[0]
+        if self.current_player_idx != 0:
+            self.message = "It's not your turn!"
+            return
+
         current_card = self.discard_pile[-1]
 
         if card_index >= len(player.hand):
@@ -148,7 +155,7 @@ class Game:
         if isinstance(played_card, WildCard):
             if played_card.value == 'Wild+4' and chosen_color not in ['Red', 'Yellow', 'Green', 'Blue']:
                 self.message = "Invalid color chosen."
-                player.hand.insert(card_index, played_card)  # vrátit kartu zpět
+                player.hand.insert(card_index, played_card)
                 return
             skip_next = played_card.apply_effect(self, chosen_color)
         elif isinstance(played_card, ActionCard):
@@ -157,7 +164,7 @@ class Game:
         if not skip_next:
             self.next_player()
 
-        if self.players[self.current_player_idx].is_computer:
+        while self.players[self.current_player_idx].is_computer:
             self.play_computer_turn()
 
     def play_computer_turn(self):
