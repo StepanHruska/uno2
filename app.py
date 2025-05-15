@@ -21,7 +21,7 @@ def index():
 
 @app.route("/play/<int:card_index>", methods=["POST"])
 def play(card_index):
-    # Zabrání hráči hrát mimo svůj tah
+    # Zabrání hráči hrát mimo svůj tahbnbnbn
     if game.current_player_idx != 0:
         game.message = "It's not your turn!"
         return redirect(url_for("index"))

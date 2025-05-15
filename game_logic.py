@@ -1,6 +1,6 @@
 import random
 
-# --- Karty ---
+# --- Karty ---bbnb
 class Card:
     def __init__(self, color, value):
         self.color = color  # Red, Yellow, Green, Blue, None
