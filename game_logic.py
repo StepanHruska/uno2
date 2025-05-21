@@ -1,9 +1,9 @@
 import random
 
-# --- Karty ---bbnb
+# --- Karty ---
 class Card:
     def __init__(self, color, value):
-        self.color = color  # Red, Yellow, Green, Blue, None
+        self.color = color
         self.value = value
 
     def is_playable(self, other_card):
@@ -12,6 +12,12 @@ class Card:
             self.value == other_card.value or
             self.color is None
         )
+
+    @property
+    def image_filename(self):
+        color = self.color.lower() if self.color else "wild"
+        value = str(self.value).lower().replace("+", "plus")
+        return f"{color}_{value}.png"
 
     def __str__(self):
         return f"{self.color} {self.value}"
@@ -22,17 +28,14 @@ class ActionCard(Card):
         if self.value == 'Reverse':
             game.direction *= -1
         elif self.value == 'Skip':
-            game.next_player()
-            game.message += f" {game.players[game.current_player_idx].name} is skipped."
-            game.next_player()
-            return True  # signal to skip turn
+            game.message += f" {game.players[game.next_player_index()].name} is skipped."
+            game.skip_next_turn = True
         elif self.value == '+2':
-            game.next_player()
-            game.players[game.current_player_idx].draw(game.deck, 2)
-            game.message += f" {game.players[game.current_player_idx].name} draws 2 cards and is skipped."
-            game.next_player()
-            return True  # signal to skip turn
-        return False
+            next_idx = game.next_player_index()
+            game.players[next_idx].draw(game.deck, 2)
+            game.message += f" {game.players[next_idx].name} draws 2 cards and is skipped."
+            game.skip_next_turn = True
+        return game.skip_next_turn
 
 
 class WildCard(Card):
@@ -40,16 +43,19 @@ class WildCard(Card):
         super().__init__(None, value)
 
     def apply_effect(self, game, chosen_color=None):
-        self.color = chosen_color or random.choice(['Red', 'Yellow', 'Green', 'Blue'])
+        if chosen_color in ['Red', 'Yellow', 'Green', 'Blue']:
+            self.color = chosen_color
+        else:
+            self.color = random.choice(['Red', 'Yellow', 'Green', 'Blue'])
+
         game.message += f" Color chosen: {self.color}."
 
         if self.value == 'Wild+4':
-            game.next_player()
-            game.players[game.current_player_idx].draw(game.deck, 4)
-            game.message += f" {game.players[game.current_player_idx].name} draws 4 cards and is skipped."
-            game.next_player()
-            return True  # signal to skip next turn
-        return False
+            next_idx = game.next_player_index()
+            game.players[next_idx].draw(game.deck, 4)
+            game.message += f" {game.players[next_idx].name} draws 4 cards and is skipped."
+            game.skip_next_turn = True
+        return game.skip_next_turn
 
 
 # --- Balíček ---
@@ -111,6 +117,7 @@ class Game:
         self.current_player_idx = 0
         self.direction = 1
         self.message = ""
+        self.skip_next_turn = False
 
         self.start_game()
 
@@ -127,7 +134,10 @@ class Game:
         self.discard_pile.append(first_card)
 
     def next_player(self):
-        self.current_player_idx = (self.current_player_idx + self.direction) % len(self.players)
+        self.current_player_idx = self.next_player_index()
+
+    def next_player_index(self):
+        return (self.current_player_idx + self.direction) % len(self.players)
 
     def play_player_card(self, card_index, chosen_color=None):
         player = self.players[0]
@@ -151,45 +161,49 @@ class Game:
         self.discard_pile.append(played_card)
         self.message = f"{player.name} plays {played_card}."
 
-        skip_next = False
+        self.skip_next_turn = False
         if isinstance(played_card, WildCard):
             if played_card.value == 'Wild+4' and chosen_color not in ['Red', 'Yellow', 'Green', 'Blue']:
                 self.message = "Invalid color chosen."
                 player.hand.insert(card_index, played_card)
                 return
-            skip_next = played_card.apply_effect(self, chosen_color)
+            played_card.apply_effect(self, chosen_color)
         elif isinstance(played_card, ActionCard):
-            skip_next = played_card.apply_effect(self)
+            played_card.apply_effect(self)
 
-        if not skip_next:
+        self.next_player()
+
+        if self.skip_next_turn:
+            self.skip_next_turn = False
             self.next_player()
-
-        while self.players[self.current_player_idx].is_computer:
-            self.play_computer_turn()
 
     def play_computer_turn(self):
-        player = self.players[self.current_player_idx]
-        current_card = self.discard_pile[-1]
-        playable_cards = [card for card in player.hand if card.is_playable(current_card)]
+        while self.players[self.current_player_idx].is_computer and not self.is_game_over():
+            player = self.players[self.current_player_idx]
+            current_card = self.discard_pile[-1]
+            playable_cards = [card for card in player.hand if card.is_playable(current_card)]
 
-        if playable_cards:
-            card_to_play = playable_cards[0]
-            played_card = player.play_card(card_to_play, current_card)
-            self.discard_pile.append(played_card)
-            self.message = f"{player.name} plays {played_card}."
+            if playable_cards:
+                card_to_play = playable_cards[0]
+                played_card = player.play_card(card_to_play, current_card)
+                self.discard_pile.append(played_card)
+                self.message = f"{player.name} plays {played_card}."
 
-            skip_next = False
-            if isinstance(played_card, WildCard):
-                skip_next = played_card.apply_effect(self)
-            elif isinstance(played_card, ActionCard):
-                skip_next = played_card.apply_effect(self)
+                self.skip_next_turn = False
+                if isinstance(played_card, WildCard):
+                    played_card.apply_effect(self)
+                elif isinstance(played_card, ActionCard):
+                    played_card.apply_effect(self)
 
-            if not skip_next:
                 self.next_player()
-        else:
-            player.draw(self.deck)
-            self.message = f"{player.name} has no playable cards and draws a card."
-            self.next_player()
+                if self.skip_next_turn:
+                    self.skip_next_turn = False
+                    self.next_player()
+
+            else:
+                player.draw(self.deck)
+                self.message = f"{player.name} has no playable cards and draws a card."
+                self.next_player()
 
     def is_game_over(self):
         return any(len(player.hand) == 0 for player in self.players)
